@@ -3,6 +3,8 @@ import H1 from "../components/h1.astro";
 import Link from "../components/link.astro";
 import RootLayout from "../layouts/RootLayout.astro";
 import StatsControlledShader from "../components/StatsControlledShader";
+import ShinyText from "../components/ShinyText";
+import BlurText from "@/components/BlurText";
 ---
 
 <RootLayout>
@@ -16,13 +18,16 @@ import StatsControlledShader from "../components/StatsControlledShader";
 
 			<div class="p-4 sm:p-8 absolute w-full h-dvh flex flex-col justify-between z-10 pointer-events-none">
 				<div>
-					<H1 size="large"> Dot <br /> Phillips </H1>
+					<H1 size="large">
+						<BlurText client:load text="Dot" /><br />
+						<BlurText client:load text="Phillips" initialDelay={0.4} />
+					</H1>
 				</div>
 
 				<div class="mb-2 sm:mb-4 flex items-center justify-between pointer-events-auto">
 					<div class="flex items-center gap-4">
-						<Link href="#">Book a call</Link>
-						<Link href="/projects" variant="secondary">View recent work</Link>
+						<Link href="mailto:hello@x3c.ca">Email me</Link>
+						<Link href="https://github.com/cooldotty" variant="secondary">View recent work</Link>
 					</div>
 				</div>
 			</div>
