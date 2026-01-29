@@ -58,31 +58,31 @@ export default function ServerStats({ className }: ServerStatsProps) {
             }`}
           ></span>
         </span>
-        <span className="text-zinc-400">Server</span>
+        <span className="text-zinc-400">{connectionState}</span>
       </div>
 
-      {stats ? (
-        <>
-          <div className="flex items-center gap-1.5">
-            <span className="text-zinc-500">CPU</span>
-            <span className="text-zinc-300">{stats.cpu.usage.toFixed(1)}%</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-zinc-500">RAM</span>
-            <span className="text-zinc-300">
-              {formatBytes(stats.ram.used)} / {formatBytes(stats.ram.total)}
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-zinc-500">Storage</span>
-            <span className="text-zinc-300">
-              {formatBytes(stats.storage.used)} / {formatBytes(stats.storage.total)}
-            </span>
-          </div>
-        </>
-      ) : (
-        <span className="text-zinc-500">Connecting...</span>
-      )}
+      <div
+        className={`flex flex-col gap-1 pt-1 transition-opacity duration-500 ease-out ${
+          stats ? "opacity-100" : "opacity-0"
+        }`}
+      >
+        <div className="flex items-center gap-1.5">
+          <span className="text-zinc-500">CPU</span>
+          <span className="text-zinc-300">{stats?.cpu.usage.toFixed(1)}%</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-zinc-500">RAM</span>
+          <span className="text-zinc-300">
+            {stats && formatBytes(stats.ram.used)} / {stats && formatBytes(stats.ram.total)}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-zinc-500">Storage</span>
+          <span className="text-zinc-300">
+            {stats && formatBytes(stats.storage.used)} / {stats && formatBytes(stats.storage.total)}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
