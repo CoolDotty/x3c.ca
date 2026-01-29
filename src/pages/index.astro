@@ -2,7 +2,7 @@
 import H1 from "../components/h1.astro";
 import Link from "../components/link.astro";
 import RootLayout from "../layouts/RootLayout.astro";
-import WarpBackground from "../components/warp-background";
+import CosmicWavesShaders from "../components/CosmicWavesShaders";
 import AvailableForWork from "../components/available.astro";
 ---
 
@@ -10,16 +10,7 @@ import AvailableForWork from "../components/available.astro";
 	<main>
 		<div class="group relative w-full min-h-dvh flex items-center justify-center">
 			<div class="absolute w-full h-dvh -z-10">
-				<WarpBackground
-					color1="#09090b"
-					color2="#27272a"
-					color3="#52525b"
-					speed={0.6}
-					swirl={0.5}
-					swirlIterations={10}
-					shapeScale={0.3}
-					client:load
-				/>
+				<CosmicWavesShaders client:load />
 			</div>
 
 			<div class="p-4 sm:p-8 absolute w-full h-dvh flex flex-col justify-between z-10">

@@ -33,6 +33,12 @@ export interface CosmicWavesShadersProps extends React.HTMLAttributes<HTMLDivEle
    * @default 1.0
    */
   colorShift?: number
+
+  /**
+   * Duration of fade-in from black in seconds
+   * @default 2.0
+   */
+  fadeDuration?: number
 }
 
 // Via: https://www.dov.me/
@@ -152,6 +158,10 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
 
   finalColor *= vignette;
 
+  // Fade in from black
+  float fadeIn = smoothstep(0.0, u_fadeDuration, iTime);
+  finalColor *= fadeIn;
+
   fragColor = vec4(finalColor, 1.0);
 }
 `
@@ -165,6 +175,7 @@ export const CosmicWavesShaders = forwardRef<HTMLDivElement, CosmicWavesShadersP
       frequency = 1.0,
       starDensity = 1.0,
       colorShift = 1.0,
+      fadeDuration = 2.0,
       ...props
     },
     ref,
@@ -180,6 +191,7 @@ export const CosmicWavesShaders = forwardRef<HTMLDivElement, CosmicWavesShadersP
             u_frequency: { type: "1f", value: frequency },
             u_starDensity: { type: "1f", value: starDensity },
             u_colorShift: { type: "1f", value: colorShift },
+            u_fadeDuration: { type: "1f", value: fadeDuration },
           }}
         />
       </div>
