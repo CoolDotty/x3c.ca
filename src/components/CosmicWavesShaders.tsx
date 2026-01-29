@@ -1,3 +1,4 @@
+// Via: https://www.dov.me/
 import type React from "react"
 import { forwardRef } from "react"
 import { Shader } from "react-shaders"
@@ -41,7 +42,6 @@ export interface CosmicWavesShadersProps extends React.HTMLAttributes<HTMLDivEle
   fadeDuration?: number
 }
 
-// Via: https://www.dov.me/
 const fragmentShader = `
 // Hash function for pseudo-random values
 float hash(vec2 p) {
