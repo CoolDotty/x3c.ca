@@ -1,45 +1,45 @@
 // Via: https://www.dov.me/
-import type React from "react"
-import { forwardRef } from "react"
-import { Shader } from "react-shaders"
-import { cn } from "@/lib/utils"
+import type React from "react";
+import { forwardRef } from "react";
+import { Shader } from "react-shaders";
+import { cn } from "@/lib/utils";
 
 export interface CosmicWavesShadersProps extends React.HTMLAttributes<HTMLDivElement> {
   /**
    * Wave flow animation speed
    * @default 1.0
    */
-  speed?: number
+  speed?: number;
 
   /**
    * Wave height and intensity
    * @default 1.0
    */
-  amplitude?: number
+  amplitude?: number;
 
   /**
    * Wave density and pattern scale
    * @default 1.0
    */
-  frequency?: number
+  frequency?: number;
 
   /**
    * Star quantity and brightness
    * @default 1.0
    */
-  starDensity?: number
+  starDensity?: number;
 
   /**
    * Color cycling speed
    * @default 1.0
    */
-  colorShift?: number
+  colorShift?: number;
 
   /**
    * Duration of fade-in from black in seconds
    * @default 2.0
    */
-  fadeDuration?: number
+  fadeDuration?: number;
 }
 
 const fragmentShader = `
@@ -164,9 +164,12 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
 
   fragColor = vec4(finalColor, 1.0);
 }
-`
+`;
 
-export const CosmicWavesShaders = forwardRef<HTMLDivElement, CosmicWavesShadersProps>(
+export const CosmicWavesShaders = forwardRef<
+  HTMLDivElement,
+  CosmicWavesShadersProps
+>(
   (
     {
       className,
@@ -181,7 +184,11 @@ export const CosmicWavesShaders = forwardRef<HTMLDivElement, CosmicWavesShadersP
     ref,
   ) => {
     return (
-      <div className={cn("w-full h-full", className)} ref={ref} {...(props as any)}>
+      <div
+        className={cn("w-full h-full", className)}
+        ref={ref}
+        {...(props as any)}
+      >
         <Shader
           fs={fragmentShader}
           style={{ width: "100%", height: "100%" } as CSSStyleDeclaration}
@@ -195,10 +202,10 @@ export const CosmicWavesShaders = forwardRef<HTMLDivElement, CosmicWavesShadersP
           }}
         />
       </div>
-    )
+    );
   },
-)
+);
 
-CosmicWavesShaders.displayName = "CosmicWavesShaders"
+CosmicWavesShaders.displayName = "CosmicWavesShaders";
 
-export default CosmicWavesShaders
+export default CosmicWavesShaders;
