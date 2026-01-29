@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import NumberFlow from "@number-flow/react";
 
 interface Stats {
   cpu: { usage: number };
@@ -11,11 +12,11 @@ interface ServerStatsProps {
   className?: string;
 }
 
-function formatBytes(bytes: number): string {
+function bytesToDisplay(bytes: number): { value: number; unit: string } {
   const tb = bytes / (1024 ** 4);
-  if (tb >= 1) return `${tb.toFixed(1)} TB`;
+  if (tb >= 1) return { value: parseFloat(tb.toFixed(1)), unit: "TB" };
   const gb = bytes / (1024 ** 3);
-  return `${gb.toFixed(1)} GB`;
+  return { value: parseFloat(gb.toFixed(1)), unit: "GB" };
 }
 
 type ConnectionState = "connecting" | "connected" | "error";
@@ -68,18 +69,26 @@ export default function ServerStats({ className }: ServerStatsProps) {
       >
         <div className="flex items-center gap-1.5">
           <span className="text-zinc-500">CPU</span>
-          <span className="text-zinc-300">{stats?.cpu.usage.toFixed(1)}%</span>
+          <span className="text-zinc-300">
+            <NumberFlow value={stats?.cpu.usage ?? 0} format={{ minimumFractionDigits: 1, maximumFractionDigits: 1 }} />%
+          </span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-zinc-500">RAM</span>
           <span className="text-zinc-300">
-            {stats && formatBytes(stats.ram.used)} / {stats && formatBytes(stats.ram.total)}
+            <NumberFlow value={stats ? bytesToDisplay(stats.ram.used).value : 0} format={{ minimumFractionDigits: 1, maximumFractionDigits: 1 }} />
+            {" "}{stats && bytesToDisplay(stats.ram.used).unit} /{" "}
+            <NumberFlow value={stats ? bytesToDisplay(stats.ram.total).value : 0} format={{ minimumFractionDigits: 1, maximumFractionDigits: 1 }} />
+            {" "}{stats && bytesToDisplay(stats.ram.total).unit}
           </span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-zinc-500">Storage</span>
           <span className="text-zinc-300">
-            {stats && formatBytes(stats.storage.used)} / {stats && formatBytes(stats.storage.total)}
+            <NumberFlow value={stats ? bytesToDisplay(stats.storage.used).value : 0} format={{ minimumFractionDigits: 1, maximumFractionDigits: 1 }} />
+            {" "}{stats && bytesToDisplay(stats.storage.used).unit} /{" "}
+            <NumberFlow value={stats ? bytesToDisplay(stats.storage.total).value : 0} format={{ minimumFractionDigits: 1, maximumFractionDigits: 1 }} />
+            {" "}{stats && bytesToDisplay(stats.storage.total).unit}
           </span>
         </div>
       </div>
