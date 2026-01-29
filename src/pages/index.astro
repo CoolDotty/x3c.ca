@@ -3,7 +3,7 @@ import H1 from "../components/h1.astro";
 import Link from "../components/link.astro";
 import RootLayout from "../layouts/RootLayout.astro";
 import CosmicWavesShaders from "../components/CosmicWavesShaders";
-import AvailableForWork from "../components/available.astro";
+import ServerStats from "../components/ServerStats";
 ---
 
 <RootLayout>
@@ -19,7 +19,7 @@ import AvailableForWork from "../components/available.astro";
 				</div>
 
 				<div>
-					<AvailableForWork className="py-4" />
+					<ServerStats client:load className="py-4" />
 					<div class="mb-2 sm:mb-4 flex items-center justify-between">
 						<div class="flex items-center gap-4">
 							<Link href="#">Book a call</Link>
