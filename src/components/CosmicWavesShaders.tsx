@@ -40,6 +40,12 @@ export interface CosmicWavesShadersProps extends React.HTMLAttributes<HTMLDivEle
    * @default 2.0
    */
   fadeDuration?: number;
+
+  /**
+   * Delay before fade-in starts in seconds
+   * @default 0.0
+   */
+  fadeDelay?: number;
 }
 
 const fragmentShader = `
@@ -94,6 +100,15 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
   p.x *= iResolution.x / iResolution.y;
 
   float time = iTime * u_speed;
+
+  // Subtle rotation around a pivot below the screen for floating effect
+  vec2 pivot = vec2(0.0, -3.0);
+  float rotationAngle = sin(time * 0.01) * 0.02;
+  vec2 rotatedP = p - pivot;
+  float c = cos(rotationAngle);
+  float s = sin(rotationAngle);
+  rotatedP = vec2(rotatedP.x * c - rotatedP.y * s, rotatedP.x * s + rotatedP.y * c);
+  p = rotatedP + pivot;
 
   // Create flowing wave patterns
   vec2 wavePos = p * u_frequency;
@@ -158,8 +173,9 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
 
   finalColor *= vignette;
 
-  // Fade in from black
-  float fadeIn = smoothstep(0.0, u_fadeDuration, iTime);
+  // Fade in from black (with optional delay)
+  float fadeTime = max(0.0, iTime - u_fadeDelay);
+  float fadeIn = smoothstep(0.0, u_fadeDuration, fadeTime);
   finalColor *= fadeIn;
 
   fragColor = vec4(finalColor, 1.0);
@@ -179,6 +195,7 @@ export const CosmicWavesShaders = forwardRef<
       starDensity = 1.0,
       colorShift = 1.0,
       fadeDuration = 2.0,
+      fadeDelay = 0.0,
       ...props
     },
     ref,
@@ -199,6 +216,7 @@ export const CosmicWavesShaders = forwardRef<
             u_starDensity: { type: "1f", value: starDensity },
             u_colorShift: { type: "1f", value: colorShift },
             u_fadeDuration: { type: "1f", value: fadeDuration },
+            u_fadeDelay: { type: "1f", value: fadeDelay },
           }}
         />
       </div>
