@@ -1,0 +1,34 @@
+---
+import H1 from "../components/h1.astro";
+import Link from "../components/link.astro";
+import RootLayout from "../layouts/RootLayout.astro";
+import StatsControlledShader from "../components/StatsControlledShader";
+import BlurText from "@/components/BlurText";
+---
+
+<RootLayout title="404 — Dot Phillips" description="Lost in the cosmic waves.">
+	<main>
+		<div class="group relative flex min-h-dvh w-full items-center justify-center">
+			<StatsControlledShader
+				client:load
+				shaderClassName="absolute w-full h-dvh -z-10"
+				statsClassName="absolute right-0 top-1/2 -translate-y-1/2 p-4 sm:p-8 z-10"
+			/>
+
+			<div
+				class="pointer-events-none absolute z-10 flex h-dvh w-full flex-col justify-between p-4 sm:p-8"
+			>
+				<div>
+					<H1 size="large">
+						<BlurText client:load text="404" initialDelay={0.1} /><br />
+						<BlurText client:load text="Lost in the void" initialDelay={0.4} />
+					</H1>
+				</div>
+
+				<div class="pointer-events-auto mb-2 flex items-center gap-4 sm:mb-4">
+					<Link href="/">Take me home</Link>
+				</div>
+			</div>
+		</div>
+	</main>
+</RootLayout>
