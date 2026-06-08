@@ -1,8 +1,8 @@
 ---
 import "../styles/global.css";
 import { Font } from "astro:assets";
-import { ClientRouter } from 'astro:transitions';
-import LoadingIndicator from "astro-loading-indicator/component"
+import { ClientRouter } from "astro:transitions";
+import LoadingIndicator from "astro-loading-indicator/component";
 
 const { title, description } = Astro.props;
 
@@ -38,9 +38,8 @@ const defaultDomain = "x3c.ca";
 		<Font cssVariable="--font-geist" preload />
 		<ClientRouter />
 		<LoadingIndicator color="#f4f4f5" height="2px" />
-
 	</head>
-	<body class="font-sans min-h-screen bg-black">
+	<body class="min-h-screen bg-black font-sans">
 		<slot />
 	</body>
 </html>
