@@ -5,47 +5,47 @@ import { Shader } from "react-shaders";
 import { cn } from "@/lib/utils";
 
 export interface CosmicWavesShadersProps extends React.HTMLAttributes<HTMLDivElement> {
-  /**
-   * Wave flow animation speed
-   * @default 1.0
-   */
-  speed?: number;
+	/**
+	 * Wave flow animation speed
+	 * @default 1.0
+	 */
+	speed?: number;
 
-  /**
-   * Wave height and intensity
-   * @default 1.0
-   */
-  amplitude?: number;
+	/**
+	 * Wave height and intensity
+	 * @default 1.0
+	 */
+	amplitude?: number;
 
-  /**
-   * Wave density and pattern scale
-   * @default 1.0
-   */
-  frequency?: number;
+	/**
+	 * Wave density and pattern scale
+	 * @default 1.0
+	 */
+	frequency?: number;
 
-  /**
-   * Star quantity and brightness
-   * @default 1.0
-   */
-  starDensity?: number;
+	/**
+	 * Star quantity and brightness
+	 * @default 1.0
+	 */
+	starDensity?: number;
 
-  /**
-   * Color cycling speed
-   * @default 1.0
-   */
-  colorShift?: number;
+	/**
+	 * Color cycling speed
+	 * @default 1.0
+	 */
+	colorShift?: number;
 
-  /**
-   * Duration of fade-in from black in seconds
-   * @default 2.0
-   */
-  fadeDuration?: number;
+	/**
+	 * Duration of fade-in from black in seconds
+	 * @default 2.0
+	 */
+	fadeDuration?: number;
 
-  /**
-   * Delay before fade-in starts in seconds
-   * @default 0.0
-   */
-  fadeDelay?: number;
+	/**
+	 * Delay before fade-in starts in seconds
+	 * @default 0.0
+	 */
+	fadeDelay?: number;
 }
 
 const fragmentShader = `
@@ -182,46 +182,45 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
 }
 `;
 
-export const CosmicWavesShaders = forwardRef<
-  HTMLDivElement,
-  CosmicWavesShadersProps
->(
-  (
-    {
-      className,
-      speed = 1.0,
-      amplitude = 1.0,
-      frequency = 1.0,
-      starDensity = 1.0,
-      colorShift = 1.0,
-      fadeDuration = 2.0,
-      fadeDelay = 0.0,
-      ...props
-    },
-    ref,
-  ) => {
-    return (
-      <div
-        className={cn("w-full h-full", className)}
-        ref={ref}
-        {...(props as any)}
-      >
-        <Shader
-          fs={fragmentShader}
-          style={{ width: "100%", height: "100%" } as CSSStyleDeclaration}
-          uniforms={{
-            u_speed: { type: "1f", value: speed },
-            u_amplitude: { type: "1f", value: amplitude },
-            u_frequency: { type: "1f", value: frequency },
-            u_starDensity: { type: "1f", value: starDensity },
-            u_colorShift: { type: "1f", value: colorShift },
-            u_fadeDuration: { type: "1f", value: fadeDuration },
-            u_fadeDelay: { type: "1f", value: fadeDelay },
-          }}
-        />
-      </div>
-    );
-  },
+export const CosmicWavesShaders = forwardRef<HTMLDivElement, CosmicWavesShadersProps>(
+	(
+		{
+			className,
+			speed = 1.0,
+			amplitude = 1.0,
+			frequency = 1.0,
+			starDensity = 1.0,
+			colorShift = 1.0,
+			fadeDuration = 2.0,
+			fadeDelay = 0.0,
+			...props
+		},
+		ref
+	) => {
+		// Cap DPR at 1.5x to keep the fullscreen fbm/star shader affordable on
+		// Retina/4K displays. The shader still gets DPR via the #define DPR
+		// preprocessor directive in react-shaders.
+		const dpr = typeof window !== "undefined" ? Math.min(window.devicePixelRatio || 1, 1.5) : 1;
+
+		return (
+			<div className={cn("h-full w-full", className)} ref={ref} {...(props as any)}>
+				<Shader
+					fs={fragmentShader}
+					devicePixelRatio={dpr}
+					style={{ width: "100%", height: "100%" } as CSSStyleDeclaration}
+					uniforms={{
+						u_speed: { type: "1f", value: speed },
+						u_amplitude: { type: "1f", value: amplitude },
+						u_frequency: { type: "1f", value: frequency },
+						u_starDensity: { type: "1f", value: starDensity },
+						u_colorShift: { type: "1f", value: colorShift },
+						u_fadeDuration: { type: "1f", value: fadeDuration },
+						u_fadeDelay: { type: "1f", value: fadeDelay },
+					}}
+				/>
+			</div>
+		);
+	}
 );
 
 CosmicWavesShaders.displayName = "CosmicWavesShaders";
