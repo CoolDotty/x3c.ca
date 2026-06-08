@@ -3,20 +3,21 @@ import H1 from "../components/h1.astro";
 import Link from "../components/link.astro";
 import RootLayout from "../layouts/RootLayout.astro";
 import StatsControlledShader from "../components/StatsControlledShader";
-import ShinyText from "../components/ShinyText";
 import BlurText from "@/components/BlurText";
 ---
 
 <RootLayout>
 	<main>
-		<div class="group relative w-full min-h-dvh flex items-center justify-center">
+		<div class="group relative flex min-h-dvh w-full items-center justify-center">
 			<StatsControlledShader
 				client:load
 				shaderClassName="absolute w-full h-dvh -z-10"
 				statsClassName="absolute right-0 top-1/2 -translate-y-1/2 p-4 sm:p-8 z-10"
 			/>
 
-			<div class="p-4 sm:p-8 absolute w-full h-dvh flex flex-col justify-between z-10 pointer-events-none">
+			<div
+				class="pointer-events-none absolute z-10 flex h-dvh w-full flex-col justify-between p-4 sm:p-8"
+			>
 				<div>
 					<H1 size="large">
 						<BlurText client:load text="Dot" /><br />
@@ -24,7 +25,7 @@ import BlurText from "@/components/BlurText";
 					</H1>
 				</div>
 
-				<div class="mb-2 sm:mb-4 flex items-center justify-between pointer-events-auto">
+				<div class="pointer-events-auto mb-2 flex items-center justify-between sm:mb-4">
 					<div class="flex items-center gap-4">
 						<Link href="mailto:hello@x3c.ca">Email me</Link>
 						<Link href="https://github.com/cooldotty" variant="secondary">View recent work</Link>
