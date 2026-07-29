@@ -48,6 +48,7 @@ export default function StatsControlledShader({
 	const [statHistory, setStatHistory] = useState<number[][]>(() =>
 		Array.from({ length: HISTORY_LENGTH }, () => [...currentHistorySample])
 	);
+	const [historyEpoch, setHistoryEpoch] = useState(0);
 
 	useEffect(() => {
 		latestHistorySampleRef.current = currentHistorySample;
@@ -56,11 +57,13 @@ export default function StatsControlledShader({
 
 	useEffect(() => {
 		const snapshotTimer = window.setInterval(() => {
+			const elapsed = (performance.now() - startTimeRef.current) / 1000;
 			setStatHistory((history) => [
 				[...latestHistorySampleRef.current],
 				[...history[0]],
 				...history.slice(1, HISTORY_LENGTH - 1),
 			]);
+			setHistoryEpoch(elapsed);
 		}, HISTORY_INTERVAL_MS);
 
 		return () => window.clearInterval(snapshotTimer);
@@ -74,6 +77,7 @@ export default function StatsControlledShader({
 				className={shaderClassName}
 				starDensity={starDensity}
 				statHistory={flattenedStatHistory}
+				historyEpoch={historyEpoch}
 				connectionState={connectionValue}
 				errorStartedAt={errorStartedAt}
 				reducedMotion={Boolean(prefersReducedMotion)}
