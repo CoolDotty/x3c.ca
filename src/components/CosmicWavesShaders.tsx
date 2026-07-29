@@ -12,6 +12,12 @@ export interface CosmicWavesShadersProps extends React.HTMLAttributes<HTMLDivEle
 	statHistory?: number[];
 
 	/**
+	 * Shader-relative time of the latest history queue shift
+	 * @default 0
+	 */
+	historyEpoch?: number;
+
+	/**
 	 * Star quantity and brightness
 	 * @default 1.0
 	 */
@@ -59,28 +65,6 @@ float hash21(vec2 p) {
   return fract(p.x * p.y);
 }
 
-mat2 rotate2d(float angle) {
-  float c = cos(angle);
-  float s = sin(angle);
-  return mat2(c, -s, s, c);
-}
-
-float foldedNoise(vec2 p) {
-  float result = 0.0;
-  float weight = 0.56;
-  mat2 octaveRotation = mat2(0.80, -0.60, 0.60, 0.80);
-
-  for (int octave = 0; octave < 3; octave++) {
-    vec2 cell = abs(fract(p) - 0.5);
-    float ridge = 1.0 - saturate((cell.x + cell.y) * 1.65);
-    result += ridge * ridge * weight;
-    p = octaveRotation * p * 1.87 + vec2(1.7, 2.9);
-    weight *= 0.54;
-  }
-
-  return saturate(result);
-}
-
 float auroraPath(float z) {
   return sin(z * 0.112) * 2.25 + sin(z * 0.041 + 1.8) * 1.15;
 }
@@ -94,6 +78,105 @@ mat3 lookAt(vec3 origin, vec3 target) {
 
 const float STREAM_SPEED = 0.82;
 const float HISTORY_INTERVAL = 4.0;
+const float CURTAIN_BOTTOM = 0.62;
+const float CURTAIN_TOP = 8.4;
+const float CURTAIN_LAYERS = 14.0;
+const float CURTAIN_VANISH_HEIGHT = 0.74;
+const float CURTAIN_MERGE_START = 20.0;
+const float CURTAIN_MERGE_END = 56.0;
+
+float smoothWave(float coordinate, float seed) {
+  return 0.50
+    + sin(coordinate + seed) * 0.27
+    + sin(coordinate * 1.73 + seed * 1.31) * 0.15
+    + sin(coordinate * 3.11 - seed * 0.73) * 0.08;
+}
+
+float ribbonCenterAt(vec3 position, float layer, float turbulence) {
+  float broadWave = smoothWave(position.z * 0.18, layer * 1.7);
+  float center = auroraPath(position.z);
+  center += (broadWave - 0.5) * (0.42 + turbulence * 0.46);
+  center += sin(position.z * 0.37 + layer * 1.1) * 0.11;
+  return center;
+}
+
+float curtainSurfaceHeight(float baseHeight, float depth) {
+  float heightRetention = 1.0 - smoothstep(
+    CURTAIN_MERGE_START,
+    CURTAIN_MERGE_END,
+    depth
+  );
+  return mix(CURTAIN_VANISH_HEIGHT, baseHeight, heightRetention);
+}
+
+float curtainRayDistance(
+  float baseHeight,
+  vec3 origin,
+  vec3 direction,
+  float cameraZ
+) {
+  float lowDistance = 0.0;
+  float highDistance = 76.0;
+
+  // Solve the intersection with a curtain whose rows continuously converge
+  // toward one shared horizon height. Bisection is stable for this monotonic
+  // surface and the final interpolation removes any visible stepping.
+  for (int solveIndex = 0; solveIndex < 6; solveIndex++) {
+    float middleDistance = (lowDistance + highDistance) * 0.5;
+    float middleDepth = max(
+      origin.z + direction.z * middleDistance - cameraZ,
+      0.0
+    );
+    float surfaceHeight = curtainSurfaceHeight(baseHeight, middleDepth);
+    float rayHeight = origin.y + direction.y * middleDistance;
+    float rayIsBelow = step(rayHeight, surfaceHeight);
+    lowDistance = mix(lowDistance, middleDistance, rayIsBelow);
+    highDistance = mix(middleDistance, highDistance, rayIsBelow);
+  }
+
+  float lowDepth = max(
+    origin.z + direction.z * lowDistance - cameraZ,
+    0.0
+  );
+  float highDepth = max(
+    origin.z + direction.z * highDistance - cameraZ,
+    0.0
+  );
+  float lowDifference = origin.y + direction.y * lowDistance
+    - curtainSurfaceHeight(baseHeight, lowDepth);
+  float highDifference = origin.y + direction.y * highDistance
+    - curtainSurfaceHeight(baseHeight, highDepth);
+  float rootBlend = saturate(
+    -lowDifference / max(highDifference - lowDifference, 0.001)
+  );
+  return mix(lowDistance, highDistance, rootBlend);
+}
+
+vec4 statHistoryAtDepth(float depth, float historyPhase) {
+  float segmentLength = STREAM_SPEED * HISTORY_INTERVAL;
+  float historyCoordinate = clamp(
+    depth / segmentLength - historyPhase,
+    0.0,
+    11.0
+  );
+  float currentSlot = floor(historyCoordinate);
+  float olderSlot = min(currentSlot + 1.0, 11.0);
+  float slotBlend = smoothstep(0.16, 0.84, fract(historyCoordinate));
+  vec4 currentStats = vec4(0.0);
+  vec4 olderStats = vec4(0.0);
+
+  // WebGL 1 requires constant array indices, so select the two neighboring
+  // history records without dynamically indexing the uniform array.
+  for (int historyIndex = 0; historyIndex < 12; historyIndex++) {
+    float indexValue = float(historyIndex);
+    float selectCurrent = 1.0 - step(0.5, abs(indexValue - currentSlot));
+    float selectOlder = 1.0 - step(0.5, abs(indexValue - olderSlot));
+    currentStats = mix(currentStats, u_statHistory[historyIndex], selectCurrent);
+    olderStats = mix(olderStats, u_statHistory[historyIndex], selectOlder);
+  }
+
+  return mix(currentStats, olderStats, slotBlend);
+}
 
 float starLayer(vec2 coordinates, float threshold, float seed) {
   vec2 cell = floor(coordinates);
@@ -115,7 +198,9 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
   float motion = 1.0 - u_reducedMotion;
   float streamTime = iTime * motion;
   float cameraZ = -streamTime * STREAM_SPEED;
-  float historyPhase = fract(streamTime / HISTORY_INTERVAL);
+  float historyPhase = fract(
+    max(streamTime - u_historyEpoch * motion, 0.0) / HISTORY_INTERVAL
+  );
 
   // The camera stays below the curtain and moves backwards at one constant
   // speed. Stats affect new material, never the transport itself.
@@ -140,81 +225,136 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
   finalColor += vec3(0.45, 0.68, 0.95) * stars * mix(0.34, 0.62, connected);
 
   vec4 accumulatedAurora = vec4(0.0);
-  float pixelJitter = hash21(fragCoord) * 0.7;
 
-  // A short volume integration through a world-space curtain. Non-linear
-  // spacing gives the horizon more samples without oversampling nearby space.
-  for (int sampleIndex = 0; sampleIndex < 24; sampleIndex++) {
-    float sampleProgress = (float(sampleIndex) + 0.35 + pixelJitter) / 24.0;
-    float rayDistance = 0.8 + pow(sampleProgress, 1.42) * 52.0;
-    vec3 samplePosition = cameraOrigin + rayDirection * rayDistance;
-    vec4 sampleStats = u_statHistory[sampleIndex / 2];
-    if (sampleIndex >= 2) {
-      // As a snapshot interval elapses, younger material advances into this
-      // depth slot. The array shift at the interval boundary is then seamless.
-      sampleStats = mix(
-        sampleStats,
-        u_statHistory[(sampleIndex - 2) / 2],
-        historyPhase
-      );
-    }
+  // Intersect the view ray with several exact, translucent ribbon sheets.
+  // Their analytic edges remain stable from frame to frame, unlike a dithered
+  // volume march, and naturally get cheaper toward the horizon.
+  for (int layerIndex = 0; layerIndex < 14; layerIndex++) {
+    float layer = (float(layerIndex) + 0.5) / CURTAIN_LAYERS;
+    float sheetHeight = mix(CURTAIN_BOTTOM, CURTAIN_TOP, layer);
+    float rayDistance = curtainRayDistance(
+      sheetHeight,
+      cameraOrigin,
+      rayDirection,
+      cameraZ
+    );
+    float visibleRay = smoothstep(0.012, 0.040, rayDirection.y);
+    visibleRay *= 1.0 - smoothstep(68.0, 76.0, rayDistance);
+    vec3 sheetPosition = cameraOrigin + rayDirection * rayDistance;
+    float depth = max(sheetPosition.z - cameraZ, 0.0);
+    float horizonMerge = smoothstep(
+      CURTAIN_MERGE_START,
+      CURTAIN_MERGE_END,
+      depth
+    );
+    vec4 sampleStats = statHistoryAtDepth(depth, historyPhase);
     float sampleTurbulence = sampleStats.x;
     float sampleCoverage = sampleStats.y;
     float sampleIntensity = sampleStats.z;
     float sampleStorage = saturate((sampleStats.w - 0.55) / 0.90);
-    float coverageHeight = mix(2.5, 6.8, sampleCoverage);
 
-    float pathCenter = auroraPath(samplePosition.z);
-    float ribbonWarp = (foldedNoise(vec2(
-      samplePosition.z * 0.105,
-      samplePosition.y * 0.19 + 1.7
-    )) - 0.36) * (0.52 + sampleTurbulence * 0.34);
-    float lateralDistance = abs(samplePosition.x - pathCenter - ribbonWarp);
-
-    float ribbonFalloff = mix(3.0, 1.65, sampleCoverage);
-    float ribbon = exp(-lateralDistance * ribbonFalloff);
-    float surroundingGlow = exp(-lateralDistance * 0.72) * 0.045;
-    float heightEnvelope = smoothstep(0.20, 0.72, samplePosition.y);
-    heightEnvelope *= exp(-max(samplePosition.y - 0.9, 0.0) / coverageHeight);
-
-    // Noise varies mainly along the path, so the resulting structures remain
-    // vertically coherent like real auroral rays.
-    float filaments = foldedNoise(vec2(
-      samplePosition.z * (0.31 + sampleTurbulence * 0.055),
-      3.1
-    ));
-    filaments = pow(saturate((filaments - 0.08) * 1.42), 2.2);
-    float fineRays = pow(
-      0.5 + 0.5 * sin(samplePosition.z * (3.2 + sampleTurbulence) + ribbonWarp * 5.0),
-      8.0
+    float pathCenter = ribbonCenterAt(
+      sheetPosition,
+      mix(layer, 0.5, horizonMerge),
+      sampleTurbulence
     );
-    float lowerEdge = 0.79
-      + sin(samplePosition.z * 0.19 + sin(samplePosition.z * 0.071) * 1.3) * 0.09;
-    float luminousSpine = exp(-abs(samplePosition.y - lowerEdge) * 7.5);
-    float density = heightEnvelope * (
-      ribbon * (0.07 + filaments * 1.72 + fineRays * 0.42)
-      + surroundingGlow * (0.08 + filaments * 0.32)
-    );
-    density += ribbon * luminousSpine * (0.62 + fineRays * 0.55);
 
-    float distanceFade = exp(-rayDistance * 0.018);
-    float sampleAlpha = density * sampleIntensity * mix(0.14, 0.34, sampleProgress) * distanceFade;
-    float storedSpark = step(
-      mix(0.996, 0.958, sampleStorage),
-      hash21(floor(samplePosition.zy * vec2(2.2, 2.8)))
-    );
-    sampleAlpha += storedSpark * ribbon * heightEnvelope * 0.09;
-    sampleAlpha *= 1.0 - accumulatedAurora.a;
+    float baseRibbonWidth = mix(0.25, 0.68, sampleCoverage);
+    baseRibbonWidth *= 0.94 + layer * 0.24;
 
-    float colorHeight = saturate((samplePosition.y - 0.55) / max(coverageHeight, 0.1));
-    vec3 auroraGreen = vec3(0.075, 1.00, 0.50);
-    vec3 auroraCyan = vec3(0.06, 0.58, 1.00);
-    vec3 auroraViolet = vec3(0.48, 0.16, 1.00);
-    vec3 sampleColor = mix(auroraGreen, auroraCyan, saturate(colorHeight * 1.7));
-    sampleColor = mix(sampleColor, auroraViolet, pow(colorHeight, 2.8) * 0.42);
+    // Estimate how far this sheet's center moves before the next height slice.
+    // A ribbon radius of 58% of the center spacing gives neighboring rows a
+    // controlled overlap. Taking the maximum instead of adding widths avoids
+    // a lower row growing far enough to swallow the row above it.
+    float layerStep = 1.0 / CURTAIN_LAYERS;
+    float heightStep = (CURTAIN_TOP - CURTAIN_BOTTOM) * layerStep;
+    float neighborRayDistance = curtainRayDistance(
+      sheetHeight + heightStep,
+      cameraOrigin,
+      rayDirection,
+      cameraZ
+    );
+    vec3 neighborPosition = cameraOrigin + rayDirection * neighborRayDistance;
+    float neighborCenter = ribbonCenterAt(
+      neighborPosition,
+      mix(min(layer + layerStep, 1.0), 0.5, horizonMerge),
+      sampleTurbulence
+    );
+    float currentOffset = sheetPosition.x - pathCenter;
+    float neighborOffset = neighborPosition.x - neighborCenter;
+    float rowSpacing = abs(neighborOffset - currentOffset);
+    float overlapRatio = mix(0.66, 0.94, horizonMerge);
+    float overlapMatchedWidth = rowSpacing * overlapRatio;
+    float ribbonWidth = max(baseRibbonWidth, overlapMatchedWidth);
+    float widthExpansion = ribbonWidth / max(baseRibbonWidth, 0.001);
+
+    float lateralDistance = abs(sheetPosition.x - pathCenter);
+    float worldPixel = max(0.012, rayDistance * 1.55 / max(iResolution.y, 1.0));
+    float ribbonCore = 1.0 - smoothstep(
+      ribbonWidth * 0.54 - worldPixel,
+      ribbonWidth * 1.04 + worldPixel,
+      lateralDistance
+    );
+    float ribbonBody = exp(
+      -pow(lateralDistance / max(ribbonWidth, 0.001), 2.0) * 1.92
+    );
+    float surroundingGlow = exp(
+      -lateralDistance / max(ribbonWidth * 2.8, 0.001)
+    );
+
+    float coverageLimit = mix(0.46, 1.0, sampleCoverage);
+    float coverageEnvelope = 1.0 - smoothstep(
+      coverageLimit - 0.13,
+      coverageLimit + 0.08,
+      layer
+    );
+    float flowingSheen = smoothWave(
+      sheetPosition.z * (0.56 + sampleTurbulence * 0.11),
+      layer * 13.1
+    );
+    flowingSheen = mix(0.68, 1.18, smoothstep(0.12, 0.88, flowingSheen));
+    flowingSheen = mix(flowingSheen, 1.0, horizonMerge);
+    float storageSheen = mix(
+      0.95,
+      1.10,
+      smoothWave(sheetPosition.z * 1.03, layer * 17.3) * sampleStorage
+    );
+    float distanceFade = exp(-rayDistance * 0.016);
+    float layerEnvelope = sin(layer * 3.14159265);
+    float sampleAlpha = (
+      ribbonBody * flowingSheen * 0.21
+      + ribbonCore * 0.085
+      + surroundingGlow * 0.018
+    );
+    sampleAlpha *= sampleIntensity
+      * storageSheen
+      * coverageEnvelope
+      * mix(0.72, 1.0, layerEnvelope)
+      * distanceFade
+      * visibleRay;
+    sampleAlpha *= mix(1.0, 0.14, horizonMerge);
+    // Conserve approximately the same light energy when a side-on ribbon has
+    // to widen, preventing the expanded lower rows from overpowering the rest.
+    sampleAlpha /= sqrt(widthExpansion);
+    sampleAlpha *= 1.0 - accumulatedAurora.a * 0.72;
+
+    vec3 auroraGreen = vec3(0.055, 1.00, 0.48);
+    vec3 auroraCyan = vec3(0.045, 0.54, 1.00);
+    vec3 auroraViolet = vec3(0.46, 0.14, 1.00);
+    vec3 sampleColor = mix(
+      auroraGreen,
+      auroraCyan,
+      smoothstep(0.18, 0.78, layer)
+    );
+    sampleColor = mix(
+      sampleColor,
+      auroraViolet,
+      smoothstep(0.72, 1.0, layer) * 0.44
+    );
+    sampleColor = mix(sampleColor, vec3(0.055, 0.78, 0.80), horizonMerge);
 
     accumulatedAurora.rgb += sampleColor * sampleAlpha;
-    accumulatedAurora.a += sampleAlpha;
+    accumulatedAurora.a += sampleAlpha * (1.0 - accumulatedAurora.a);
   }
 
   float connectionEnergy = mix(0.34, 1.0, connected);
@@ -236,8 +376,6 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
   float vignette = smoothstep(0.92, 0.18, length((uv - 0.5) * vec2(0.82, 1.0)));
   finalColor *= mix(0.48, 1.0, vignette);
 
-  float grain = hash21(fragCoord) - 0.5;
-  finalColor += grain * 0.008;
   finalColor = vec3(1.0) - exp(-finalColor * 1.24);
   finalColor = pow(max(finalColor, vec3(0.0)), vec3(0.92));
 
@@ -255,6 +393,7 @@ export const CosmicWavesShaders = forwardRef<HTMLDivElement, CosmicWavesShadersP
 			className,
 			starDensity = 1.0,
 			statHistory = Array.from({ length: 12 }, () => [1.0, 0.5, 1.0, 1.0]).flat(),
+			historyEpoch = 0,
 			connectionState = 1,
 			errorStartedAt = -999,
 			reducedMotion = false,
@@ -264,8 +403,8 @@ export const CosmicWavesShaders = forwardRef<HTMLDivElement, CosmicWavesShadersP
 		},
 		ref
 	) => {
-		// Motion clarity matters more than supersampling here; the grain and soft
-		// volume hide the lower framebuffer resolution on high-DPI displays.
+		// Render at full CSS-pixel resolution on every display. The shader uses
+		// procedural distance LOD so nearby aurora detail stays crisp.
 		const dpr = 1;
 
 		return (
@@ -277,6 +416,7 @@ export const CosmicWavesShaders = forwardRef<HTMLDivElement, CosmicWavesShadersP
 					uniforms={{
 						u_starDensity: { type: "1f", value: starDensity },
 						u_statHistory: { type: "4fv", value: statHistory },
+						u_historyEpoch: { type: "1f", value: historyEpoch },
 						u_connectionState: { type: "1f", value: connectionState },
 						u_errorStartedAt: { type: "1f", value: errorStartedAt },
 						u_reducedMotion: { type: "1f", value: reducedMotion ? 1 : 0 },
