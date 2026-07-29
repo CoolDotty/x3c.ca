@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useReducedMotion } from "motion/react";
 import { useServerStats } from "@/hooks/useServerStats";
 import { useInterpolatedValue } from "@/hooks/useInterpolatedValue";
@@ -12,6 +12,9 @@ interface StatsControlledShaderProps {
 	interpolationSpeed?: number;
 }
 
+const HISTORY_LENGTH = 12;
+const HISTORY_INTERVAL_MS = 4_000;
+
 export default function StatsControlledShader({
 	shaderClassName,
 	statsClassName,
@@ -19,38 +22,62 @@ export default function StatsControlledShader({
 }: StatsControlledShaderProps) {
 	const { stats, connectionState } = useServerStats();
 	const startTimeRef = useRef(performance.now());
-	const [fadeDelay, setFadeDelay] = useState<number | null>(null);
+	const [errorStartedAt, setErrorStartedAt] = useState(-999);
 	const prefersReducedMotion = useReducedMotion();
 
 	useEffect(() => {
-		if (connectionState === "connected" && fadeDelay === null) {
+		if (connectionState === "error") {
 			const elapsed = (performance.now() - startTimeRef.current) / 1000;
-			setFadeDelay(elapsed);
+			setErrorStartedAt(elapsed);
 		}
-	}, [connectionState, fadeDelay]);
+	}, [connectionState]);
 
 	const targetParams = useMemo(() => statsToShaderParams(stats), [stats]);
+	const starDensity = useInterpolatedValue(targetParams.starDensity, interpolationSpeed);
+	const connectionValue = connectionState === "connected" ? 1 : connectionState === "error" ? 2 : 0;
+	const currentHistorySample = useMemo(
+		() => [
+			targetParams.turbulence,
+			targetParams.coverage,
+			targetParams.intensity,
+			targetParams.starDensity,
+		],
+		[targetParams]
+	);
+	const latestHistorySampleRef = useRef(currentHistorySample);
+	const [statHistory, setStatHistory] = useState<number[][]>(() =>
+		Array.from({ length: HISTORY_LENGTH }, () => [...currentHistorySample])
+	);
 
-	const targetSpeed = prefersReducedMotion ? 0 : targetParams.speed;
-	const targetColorShift = prefersReducedMotion ? 0 : targetParams.colorShift;
-	const targetStarDensity = prefersReducedMotion ? 0 : targetParams.starDensity;
+	useEffect(() => {
+		latestHistorySampleRef.current = currentHistorySample;
+		setStatHistory((history) => [[...currentHistorySample], ...history.slice(1)]);
+	}, [currentHistorySample]);
 
-	const speed = useInterpolatedValue(targetSpeed, interpolationSpeed);
-	const amplitude = useInterpolatedValue(targetParams.amplitude, interpolationSpeed);
-	const frequency = useInterpolatedValue(targetParams.frequency, interpolationSpeed);
-	const starDensity = useInterpolatedValue(targetStarDensity, interpolationSpeed);
-	const colorShift = useInterpolatedValue(targetColorShift, interpolationSpeed);
+	useEffect(() => {
+		const snapshotTimer = window.setInterval(() => {
+			setStatHistory((history) => [
+				[...latestHistorySampleRef.current],
+				[...history[0]],
+				...history.slice(1, HISTORY_LENGTH - 1),
+			]);
+		}, HISTORY_INTERVAL_MS);
+
+		return () => window.clearInterval(snapshotTimer);
+	}, []);
+
+	const flattenedStatHistory = useMemo(() => statHistory.flat(), [statHistory]);
 
 	return (
 		<>
 			<CosmicWavesShaders
 				className={shaderClassName}
-				speed={speed}
-				amplitude={amplitude}
-				frequency={frequency}
 				starDensity={starDensity}
-				colorShift={colorShift}
-				fadeDelay={fadeDelay ?? 9999}
+				statHistory={flattenedStatHistory}
+				connectionState={connectionValue}
+				errorStartedAt={errorStartedAt}
+				reducedMotion={Boolean(prefersReducedMotion)}
+				fadeDelay={0.15}
 			/>
 			<ServerStatsDisplay
 				stats={stats}
